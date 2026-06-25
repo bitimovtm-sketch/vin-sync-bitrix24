@@ -11,7 +11,7 @@ P1_WEBHOOK        = os.environ['P1_WEBHOOK']
 P2_WEBHOOK        = os.environ['P2_WEBHOOK']
 VIN_FIELD_P1      = os.environ['VIN_FIELD_P1']
 VIN_FIELD_P2      = os.environ['VIN_FIELD_P2']
-VIN_LAST_FIELD_P1 = os.environ['VIN_LAST_FIELD_P1']  # служебное поле на П1
+VIN_LAST_FIELD_P1 = os.environ['VIN_LAST_FIELD_P1']
 BP_TEMPLATE_ID    = os.environ['BP_TEMPLATE_ID']
 
 
@@ -62,14 +62,15 @@ def vin_sync():
         bp = b24_call(P2_WEBHOOK, 'bizproc.workflow.start', {
             'TEMPLATE_ID': BP_TEMPLATE_ID,
             'DOCUMENT_ID': ['crm', 'CCrmDocumentDeal', deal_id_p2],
-            'PARAMETERS': {},
+            'PARAMETERS': {
+                'Parameter1': vin_current,
+            },
         })
         bp_result = bp.get('result')
     else:
         logger.warning(f"VIN {vin_current!r} не найден на П2")
 
     # 4. Записываем текущий VIN в служебное поле П1
-    #    (делаем это в любом случае — даже если на П2 не нашли, чтобы не повторять поиск)
     b24_call(P1_WEBHOOK, 'crm.deal.update', {
         'id': deal_id,
         'fields': {VIN_LAST_FIELD_P1: vin_current},
