@@ -45,30 +45,33 @@ def vin_sync():
 
     logger.info(f"deal {deal_id}: VIN изменился {vin_last!r} → {vin_current!r}")
 
-    # 3. Ищем сделку на П2 по новому VIN
-    found = b24_call(P2_WEBHOOK, 'crm.deal.list', {
-        'filter': {VIN_FIELD_P2: vin_current},
-        'select': ['ID'],
-    })
-    deals_p2 = found.get('result', [])
-
+    # 3. Ищем сделку на П2 по СТАРОМУ VIN
     bp_result = None
     deal_id_p2 = None
 
-    if deals_p2:
-        deal_id_p2 = str(deals_p2[0]['ID'])
-        logger.info(f"VIN {vin_current!r} → сделка П2 #{deal_id_p2}, запускаем БП {BP_TEMPLATE_ID}")
-
-        bp = b24_call(P2_WEBHOOK, 'bizproc.workflow.start', {
-            'TEMPLATE_ID': BP_TEMPLATE_ID,
-            'DOCUMENT_ID': ['crm', 'CCrmDocumentDeal', deal_id_p2],
-            'PARAMETERS': {
-                'Parameter1': vin_current,
-            },
-        })
-        bp_result = bp.get('result')
+    if not vin_last:
+        logger.warning(f"deal {deal_id}: старый VIN пустой, искать на П2 нечего")
     else:
-        logger.warning(f"VIN {vin_current!r} не найден на П2")
+        found = b24_call(P2_WEBHOOK, 'crm.deal.list', {
+            'filter': {VIN_FIELD_P2: vin_last},
+            'select': ['ID'],
+        })
+        deals_p2 = found.get('result', [])
+
+        if deals_p2:
+            deal_id_p2 = str(deals_p2[0]['ID'])
+            logger.info(f"Сделка П2 #{deal_id_p2} (старый VIN {vin_last!r}), запускаем БП {BP_TEMPLATE_ID} с новым VIN {vin_current!r}")
+
+            bp = b24_call(P2_WEBHOOK, 'bizproc.workflow.start', {
+                'TEMPLATE_ID': BP_TEMPLATE_ID,
+                'DOCUMENT_ID': ['crm', 'CCrmDocumentDeal', deal_id_p2],
+                'PARAMETERS': {
+                    'Parameter1': vin_current,
+                },
+            })
+            bp_result = bp.get('result')
+        else:
+            logger.warning(f"Старый VIN {vin_last!r} не найден на П2")
 
     # 4. Записываем текущий VIN в служебное поле П1
     b24_call(P1_WEBHOOK, 'crm.deal.update', {
@@ -79,8 +82,8 @@ def vin_sync():
 
     return jsonify({
         'status': 'ok',
-        'vin': vin_current,
-        'vin_previous': vin_last,
+        'vin_new': vin_current,
+        'vin_old': vin_last,
         'deal_p2': deal_id_p2,
         'bp_result': bp_result,
     }), 200
