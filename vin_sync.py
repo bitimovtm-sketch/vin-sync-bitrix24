@@ -17,7 +17,7 @@ BP_TEMPLATE_ID    = os.environ['BP_TEMPLATE_ID']
 
 def b24_call(webhook: str, method: str, params: dict) -> dict:
     url = f"{webhook.rstrip('/')}/{method}"
-    resp = requests.post(url, json=params, timeout=10)
+    resp = requests.post(url, json=params, timeout=30)
     resp.raise_for_status()
     return resp.json()
 
