@@ -41,6 +41,12 @@ def vin_sync():
     # 2. Сравниваем с предыдущим значением
     vin_previous = vin_cache.get(deal_id)
 
+    if vin_previous is None:
+        # Первый раз видим эту сделку — просто запоминаем VIN
+        logger.info(f"deal {deal_id}: первый вызов, запоминаем VIN {vin_current!r}")
+        vin_cache[deal_id] = vin_current
+        return jsonify({'status': 'skip', 'reason': 'first call, vin remembered'}), 200
+
     if vin_previous == vin_current:
         logger.info(f"deal {deal_id}: VIN не изменился ({vin_current!r}), пропускаем")
         return jsonify({'status': 'skip', 'reason': 'vin not changed'}), 200
@@ -68,3 +74,12 @@ def vin_sync():
     bp = b24_call(P2_WEBHOOK, 'bizproc.workflow.start', {
         'TEMPLATE_ID': BP_TEMPLATE_ID,
         'DOCUMENT_ID': ['crm', 'CCrmDocumentDeal', deal_id_p2],
+        'PARAMETERS': {},
+    })
+
+    return jsonify({
+        'status': 'ok',
+        'vin': vin_current,
+        'deal_p2': deal_id_p2,
+        'bp_result': bp.get('result'),
+    }), 200
